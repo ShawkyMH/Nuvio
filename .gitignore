@@ -19,7 +19,6 @@ build/
 *.class
 *.keystore
 *.jks
-!keystore/nuvio-release.jks
 *.base64.txt
 signing.properties
 scratch/

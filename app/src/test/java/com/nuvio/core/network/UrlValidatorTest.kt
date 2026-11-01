@@ -55,4 +55,28 @@ class UrlValidatorTest {
         assertTrue(UrlValidator.isMediaSource("https://example.com/media/audio.mp3"))
         assertFalse(UrlValidator.isMediaSource("https://example.com/document.pdf"))
     }
+
+    @Test
+    fun testSanitizeStreamUrl_removesRangeParameters() {
+        assertEquals(
+            "https://rr1.googlevideo.com/videoplayback?expire=123&itag=22",
+            UrlValidator.sanitizeStreamUrl("https://rr1.googlevideo.com/videoplayback?expire=123&range=0-758784&itag=22")
+        )
+        assertEquals(
+            "https://rr1.googlevideo.com/videoplayback?expire=123",
+            UrlValidator.sanitizeStreamUrl("https://rr1.googlevideo.com/videoplayback?expire=123&range=0-758784")
+        )
+        assertEquals(
+            "https://rr1.googlevideo.com/videoplayback",
+            UrlValidator.sanitizeStreamUrl("https://rr1.googlevideo.com/videoplayback?range=0-758784")
+        )
+        assertEquals(
+            "https://rr1.googlevideo.com/videoplayback?itag=22",
+            UrlValidator.sanitizeStreamUrl("https://rr1.googlevideo.com/videoplayback?range=0-758784&itag=22")
+        )
+        assertEquals(
+            "https://example.com/stream.mp4",
+            UrlValidator.sanitizeStreamUrl("https://example.com/stream.mp4")
+        )
+    }
 }

@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.nuvio.core.network.UrlValidator
 import com.nuvio.core.storage.FileManager
 import com.nuvio.domain.model.DownloadTask
+import com.nuvio.domain.model.FormatType
 import com.nuvio.domain.model.TaskStatus
 import com.nuvio.domain.repository.DownloadRepository
+import com.nuvio.domain.repository.MediaRepository
 import com.nuvio.domain.repository.SettingsRepository
 import com.nuvio.engine.browser.MediaCandidate
+import com.nuvio.engine.media.YouTubeStreamExtractor
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -37,6 +40,7 @@ data class BrowserUiState(
 class BrowserViewModel(
     private val downloadRepository: DownloadRepository,
     private val fileManager: FileManager,
+    private val mediaRepository: MediaRepository? = null,
     private val settingsRepository: SettingsRepository? = null
 ) : ViewModel() {
 
@@ -105,13 +109,57 @@ class BrowserViewModel(
         dismissDetectedMedia()
 
         viewModelScope.launch {
+            val currentWebUrl = _uiState.value.currentUrl
+            val isCurrentYouTube = YouTubeStreamExtractor.isYouTubeUrl(currentWebUrl)
+            val isCandidateYouTube = YouTubeStreamExtractor.isYouTubeUrl(candidate.url) || candidate.url.contains("googlevideo.com")
+
+            // 1. YouTube video detection: Resolve actual full stream via YouTubeStreamExtractor
+            if ((isCurrentYouTube || isCandidateYouTube) && mediaRepository != null) {
+                val targetUrl = if (isCurrentYouTube) currentWebUrl else candidate.url
+                _events.emit(BrowserEvent.ShowToast("Resolving full media stream..."))
+                val ytResult = mediaRepository.inspectMedia(targetUrl)
+                if (ytResult.isSuccess) {
+                    val metadata = ytResult.getOrThrow()
+                    // Select best video format with direct streamUrl (or fallback to audio)
+                    val selectedFormat = metadata.formats.firstOrNull { it.formatType == FormatType.VIDEO && !it.streamUrl.isNullOrBlank() }
+                        ?: metadata.formats.firstOrNull { !it.streamUrl.isNullOrBlank() }
+
+                    if (selectedFormat != null && !selectedFormat.streamUrl.isNullOrBlank()) {
+                        val cleanTitle = metadata.title.replace(Regex("""[\\/:*?"<>|]"""), "_").trim()
+                        val fileName = "$cleanTitle.${selectedFormat.container}"
+                        val targetFile = fileManager.createTargetFile(fileName)
+                        val task = DownloadTask(
+                            id = UUID.randomUUID().toString(),
+                            url = selectedFormat.streamUrl!!,
+                            title = fileName,
+                            filePath = targetFile.absolutePath,
+                            totalBytes = selectedFormat.estimatedBytes,
+                            mimeType = "video/${selectedFormat.container}",
+                            isMediaExtraction = true,
+                            connectionCount = settingsRepository?.settingsFlow?.value?.connectionsPerDownload ?: 4,
+                            status = TaskStatus.QUEUED
+                        )
+                        downloadRepository.insertTask(task)
+                        _events.emit(BrowserEvent.ShowToast("Download started: $fileName"))
+                        return@launch
+                    }
+                }
+            }
+
+            // 2. Direct media links or other websites:
+            // Sanitize stream URL to remove player buffer range query params (e.g. &range=0-758784)
+            val cleanUrl = UrlValidator.sanitizeStreamUrl(candidate.url)
             val rawTitle = candidate.pageTitle?.replace(Regex("""[\\/:*?"<>|]"""), "_")?.trim()
-            val fileName = UrlValidator.extractFileNameFromUrl(candidate.url, fallback = "media_${System.currentTimeMillis()}.mp4")
-            val targetFile = fileManager.createTargetFile(if (!rawTitle.isNullOrBlank()) "$rawTitle.mp4" else fileName)
+            val fileName = UrlValidator.extractFileNameFromUrl(cleanUrl, fallback = "media_${System.currentTimeMillis()}.mp4")
+            val finalFileName = if (!rawTitle.isNullOrBlank()) {
+                if (rawTitle.contains('.')) rawTitle else "$rawTitle.mp4"
+            } else fileName
+
+            val targetFile = fileManager.createTargetFile(finalFileName)
             val task = DownloadTask(
                 id = UUID.randomUUID().toString(),
-                url = candidate.url,
-                title = if (!rawTitle.isNullOrBlank()) rawTitle else fileName,
+                url = cleanUrl,
+                title = finalFileName,
                 filePath = targetFile.absolutePath,
                 mimeType = candidate.mimeType ?: "video/*",
                 isMediaExtraction = false,

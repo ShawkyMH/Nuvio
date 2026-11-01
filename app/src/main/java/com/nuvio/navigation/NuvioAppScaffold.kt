@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,6 +73,7 @@ fun NuvioAppScaffold(
         BrowserViewModel(
             downloadRepository = container.downloadRepository,
             fileManager = container.fileManager,
+            mediaRepository = container.mediaRepository,
             settingsRepository = container.settingsRepository
         )
     }
@@ -118,7 +120,7 @@ fun NuvioAppScaffold(
         )
     }
 
-    remember(initialSharedUrl) {
+    LaunchedEffect(initialSharedUrl) {
         if (!initialSharedUrl.isNullOrBlank()) {
             homeViewModel.onQueryChange(initialSharedUrl)
             homeViewModel.submitQuery(initialSharedUrl)

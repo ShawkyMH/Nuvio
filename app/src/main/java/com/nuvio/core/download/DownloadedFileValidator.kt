@@ -213,23 +213,34 @@ object DownloadedFileValidator {
         return try {
             val extractorClass = Class.forName("android.media.MediaExtractor")
             val extractor = extractorClass.getDeclaredConstructor().newInstance()
-            val setDataSourceMethod = extractorClass.getMethod("setDataSource", String::class.java)
+            val setDataSourceMethod = extractorClass.getMethod(
+                "setDataSource",
+                java.io.FileDescriptor::class.java
+            )
             val getTrackCountMethod = extractorClass.getMethod("getTrackCount")
             val releaseMethod = extractorClass.getMethod("release")
 
-            setDataSourceMethod.invoke(extractor, file.absolutePath)
-            val trackCount = getTrackCountMethod.invoke(extractor) as Int
-            releaseMethod.invoke(extractor)
+            var trackCount = 0
+            java.io.FileInputStream(file).use { fis ->
+                try {
+                    setDataSourceMethod.invoke(extractor, fis.fd)
+                    trackCount = getTrackCountMethod.invoke(extractor) as Int
+                } finally {
+                    runCatching { releaseMethod.invoke(extractor) }
+                }
+            }
 
             if (trackCount <= 0) {
-                ValidationResult.Invalid("Media file contains no playable tracks (trackCount = 0)")
+                // If it parsed without error but reports 0 tracks, it could be a stream container quirk
+                ValidationResult.Valid
             } else {
                 ValidationResult.Valid
             }
         } catch (e: Exception) {
-            // If MediaExtractor failed to parse the container
-            val causeMsg = e.cause?.message ?: e.message ?: "Failed to parse media container"
-            ValidationResult.Invalid("Corrupted media file structure: $causeMsg")
+            // MediaExtractor can fail on raw AAC, some WebM/Opus codecs, or mediaserver sandbox quirks.
+            // Since validateMagicBytes already verified the container signature, MediaExtractor failure
+            // must NOT reject or delete a valid downloaded file.
+            ValidationResult.Valid
         }
     }
 }

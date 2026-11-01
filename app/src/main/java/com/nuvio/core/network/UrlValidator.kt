@@ -62,4 +62,18 @@ object UrlValidator {
             }
         }.getOrDefault(fallback)
     }
+
+    /**
+     * Sanitizes stream URLs intercepted by passive network sniffing
+     * by stripping player-specific partial range query parameters (e.g. &range=0-758784).
+     */
+    fun sanitizeStreamUrl(url: String): String {
+        return runCatching {
+            url.replace(Regex("""([?&])range=\d+-\d+(&|$)""")) { mr ->
+                if (mr.groupValues[1] == "?" && mr.groupValues[2] == "&") "?"
+                else if (mr.groupValues[1] == "&" && mr.groupValues[2] == "&") "&"
+                else ""
+            }.removeSuffix("?").removeSuffix("&")
+        }.getOrDefault(url)
+    }
 }
