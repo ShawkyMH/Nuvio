@@ -181,9 +181,9 @@ fun HomeScreen(
                 items(activeDownloads, key = { it.id }) { task ->
                     DownloadCard(
                         task = task,
-                        onPauseClick = { },
-                        onResumeClick = { },
-                        onCancelClick = { },
+                        onPauseClick = { viewModel.pauseTask(task.id) },
+                        onResumeClick = { viewModel.resumeTask(task.id) },
+                        onCancelClick = { viewModel.cancelTask(task.id) },
                         onPlayClick = { onPlayMedia(task.filePath, task.title) }
                     )
                 }
@@ -202,9 +202,9 @@ fun HomeScreen(
                 items(recentDownloads.take(3), key = { it.id }) { task ->
                     DownloadCard(
                         task = task,
-                        onPauseClick = { },
-                        onResumeClick = { },
-                        onCancelClick = { },
+                        onPauseClick = { viewModel.pauseTask(task.id) },
+                        onResumeClick = { viewModel.resumeTask(task.id) },
+                        onCancelClick = { viewModel.cancelTask(task.id) },
                         onPlayClick = { onPlayMedia(task.filePath, task.title) }
                     )
                 }

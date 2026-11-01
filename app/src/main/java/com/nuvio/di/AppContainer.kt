@@ -24,6 +24,7 @@ import com.nuvio.engine.ffmpeg.FfmpegProcessor
 import com.nuvio.engine.http.HttpDownloadEngine
 import com.nuvio.engine.http.HttpRangeProber
 import com.nuvio.engine.ytdlp.YtDlpEngine
+import com.nuvio.service.download.DownloadExecutionCoordinator
 
 class AppContainer(private val context: Context) {
 
@@ -55,13 +56,18 @@ class AppContainer(private val context: Context) {
         HttpRangeProber(okHttpClient)
     }
 
+    val executionCoordinator: DownloadExecutionCoordinator by lazy {
+        DownloadExecutionCoordinator(context)
+    }
+
     val downloadEngine: HttpDownloadEngine by lazy {
         HttpDownloadEngine(
             client = okHttpClient,
             prober = httpRangeProber,
             taskDao = taskDao,
             segmentDao = segmentDao,
-            fileManager = fileManager
+            fileManager = fileManager,
+            executionCoordinator = executionCoordinator
         )
     }
 

@@ -16,13 +16,13 @@ class SegmentWorker(
     private val segment: DownloadSegment,
     private val url: String,
     private val destinationFile: File,
-    private val onProgress: suspend (bytesWritten: Long, status: SegmentStatus) -> Unit
+    private val onProgress: suspend (bytesWritten: Long, status: SegmentStatus, deltaBytes: Long) -> Unit
 ) {
 
     suspend fun execute(): Boolean = withContext(Dispatchers.IO) {
         val currentOffset = segment.startByte + segment.downloadedBytes
         if (currentOffset > segment.endByte) {
-            onProgress(segment.downloadedBytes, SegmentStatus.COMPLETED)
+            onProgress(segment.downloadedBytes, SegmentStatus.COMPLETED, 0L)
             return@withContext true
         }
 
@@ -33,15 +33,15 @@ class SegmentWorker(
 
         var raf: RandomAccessFile? = null
         try {
-            onProgress(segment.downloadedBytes, SegmentStatus.DOWNLOADING)
+            onProgress(segment.downloadedBytes, SegmentStatus.DOWNLOADING, 0L)
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful && response.code != 206) {
-                    onProgress(segment.downloadedBytes, SegmentStatus.FAILED)
+                if (response.code != 206) {
+                    onProgress(segment.downloadedBytes, SegmentStatus.FAILED, 0L)
                     return@withContext false
                 }
 
                 val body = response.body ?: run {
-                    onProgress(segment.downloadedBytes, SegmentStatus.FAILED)
+                    onProgress(segment.downloadedBytes, SegmentStatus.FAILED, 0L)
                     return@withContext false
                 }
 
@@ -56,7 +56,7 @@ class SegmentWorker(
                 while (coroutineContext.isActive && inputStream.read(buffer).also { read = it } != -1) {
                     raf!!.write(buffer, 0, read)
                     totalSegmentDownloaded += read
-                    onProgress(totalSegmentDownloaded, SegmentStatus.DOWNLOADING)
+                    onProgress(totalSegmentDownloaded, SegmentStatus.DOWNLOADING, read.toLong())
                 }
 
                 if (!coroutineContext.isActive) {
@@ -66,12 +66,12 @@ class SegmentWorker(
 
                 val isComplete = totalSegmentDownloaded >= segment.totalBytes
                 val finalStatus = if (isComplete) SegmentStatus.COMPLETED else SegmentStatus.FAILED
-                onProgress(totalSegmentDownloaded, finalStatus)
+                onProgress(totalSegmentDownloaded, finalStatus, 0L)
                 return@withContext isComplete
             }
         } catch (e: Exception) {
             if (coroutineContext.isActive) {
-                onProgress(segment.downloadedBytes, SegmentStatus.FAILED)
+                onProgress(segment.downloadedBytes, SegmentStatus.FAILED, 0L)
             }
             return@withContext false
         } finally {

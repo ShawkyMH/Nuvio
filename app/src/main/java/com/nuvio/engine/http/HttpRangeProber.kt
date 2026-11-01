@@ -18,6 +18,12 @@ class HttpRangeProber(private val client: OkHttpClient) {
 
             client.newCall(rangeRequest).execute().use { response ->
                 val code = response.code
+                val resolvedUrl = response.request.url.toString()
+
+                if (code == 404 || code == 403 || code == 401 || code >= 500) {
+                    throw IllegalStateException("Remote server returned HTTP $code")
+                }
+
                 val acceptRanges = response.header("Accept-Ranges")
                 val contentRange = response.header("Content-Range")
                 val etag = response.header("ETag")
@@ -27,7 +33,6 @@ class HttpRangeProber(private val client: OkHttpClient) {
                 val suggestedFileName = parseContentDispositionFilename(contentDisposition)
 
                 if (code == 206 && contentRange != null) {
-                    // Example: "bytes 0-0/1048576"
                     val total = parseTotalFromContentRange(contentRange)
                     RangeProbeResult(
                         supportsRanges = true,
@@ -35,10 +40,11 @@ class HttpRangeProber(private val client: OkHttpClient) {
                         etag = etag,
                         lastModified = lastModified,
                         mimeType = mimeType,
-                        suggestedFileName = suggestedFileName
+                        suggestedFileName = suggestedFileName,
+                        resolvedUrl = resolvedUrl
                     )
-                } else {
-                    // Fall back to Content-Length
+                } else if (response.isSuccessful) {
+                    // 200 OK (server ignored Range header or does not support ranges)
                     val contentLength = response.body?.contentLength() ?: -1L
                     val supports = acceptRanges.equals("bytes", ignoreCase = true) && contentLength > 0
                     RangeProbeResult(
@@ -47,10 +53,46 @@ class HttpRangeProber(private val client: OkHttpClient) {
                         etag = etag,
                         lastModified = lastModified,
                         mimeType = mimeType,
-                        suggestedFileName = suggestedFileName
+                        suggestedFileName = suggestedFileName,
+                        resolvedUrl = resolvedUrl
                     )
+                } else {
+                    // Try fallback HEAD request without Range header (e.g. for servers returning 416 on 0-0)
+                    probeFallback(url, resolvedUrl)
                 }
             }
+        }
+    }
+
+    private fun probeFallback(originalUrl: String, redirectedUrl: String): RangeProbeResult {
+        val headRequest = Request.Builder()
+            .url(redirectedUrl.ifBlank { originalUrl })
+            .head()
+            .build()
+
+        return client.newCall(headRequest).execute().use { response ->
+            val finalUrl = response.request.url.toString()
+            val code = response.code
+            if (code >= 400) {
+                throw IllegalStateException("Remote server returned HTTP $code")
+            }
+            val acceptRanges = response.header("Accept-Ranges")
+            val contentLength = response.header("Content-Length")?.toLongOrNull() ?: -1L
+            val etag = response.header("ETag")
+            val lastModified = response.header("Last-Modified")
+            val mimeType = response.header("Content-Type") ?: "application/octet-stream"
+            val contentDisposition = response.header("Content-Disposition")
+            val suggestedFileName = parseContentDispositionFilename(contentDisposition)
+
+            RangeProbeResult(
+                supportsRanges = acceptRanges.equals("bytes", ignoreCase = true) && contentLength > 0,
+                totalBytes = contentLength,
+                etag = etag,
+                lastModified = lastModified,
+                mimeType = mimeType,
+                suggestedFileName = suggestedFileName,
+                resolvedUrl = finalUrl
+            )
         }
     }
 

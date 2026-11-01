@@ -59,7 +59,8 @@ fun NuvioAppScaffold(
 
     val downloadsViewModel = remember {
         DownloadsViewModel(
-            repository = container.downloadRepository
+            repository = container.downloadRepository,
+            fileManager = container.fileManager
         )
     }
 

@@ -2,7 +2,10 @@ package com.nuvio.feature.downloads
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nuvio.core.network.UrlValidator
+import com.nuvio.core.storage.FileManager
 import com.nuvio.domain.model.DownloadTask
+import com.nuvio.domain.model.TaskStatus
 import com.nuvio.domain.repository.DownloadRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -11,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 enum class DownloadFilter {
     ALL,
@@ -19,7 +23,8 @@ enum class DownloadFilter {
 }
 
 class DownloadsViewModel(
-    private val repository: DownloadRepository
+    private val repository: DownloadRepository,
+    private val fileManager: FileManager
 ) : ViewModel() {
 
     private val _selectedFilter = MutableStateFlow(DownloadFilter.ALL)
@@ -65,5 +70,28 @@ class DownloadsViewModel(
 
     fun resumeAll() = viewModelScope.launch {
         repository.resumeAll()
+    }
+
+    fun startDirectDownload(url: String) {
+        val trimmed = url.trim()
+        if (!UrlValidator.isValidUrl(trimmed)) return
+        viewModelScope.launch {
+            try {
+                val fileName = UrlValidator.extractFileNameFromUrl(trimmed, fallback = "download_${System.currentTimeMillis()}")
+                val targetFile = fileManager.createTargetFile(fileName)
+                val task = DownloadTask(
+                    id = UUID.randomUUID().toString(),
+                    url = trimmed,
+                    title = targetFile.name,
+                    filePath = targetFile.absolutePath,
+                    mimeType = "*/*",
+                    isMediaExtraction = false,
+                    connectionCount = 4,
+                    status = TaskStatus.QUEUED
+                )
+                repository.insertTask(task)
+            } catch (_: Exception) {
+            }
+        }
     }
 }

@@ -79,10 +79,46 @@ class HomeViewModel(
                     selectedMedia = metadata,
                     showFormatSheet = true
                 )
-            }.onFailure { error ->
-                _events.emit(HomeUiEvent.ShowToast("Inspection failed: ${error.localizedMessage ?: "Unknown error"}"))
+            }.onFailure {
+                // If media extraction fails or URL is a direct file, start direct HTTP download
+                startDirectDownload(query)
             }
         }
+    }
+
+    fun startDirectDownload(url: String) {
+        viewModelScope.launch {
+            try {
+                val fileName = UrlValidator.extractFileNameFromUrl(url, fallback = "download_${System.currentTimeMillis()}")
+                val targetFile = fileManager.createTargetFile(fileName)
+                val task = DownloadTask(
+                    id = UUID.randomUUID().toString(),
+                    url = url,
+                    title = targetFile.name,
+                    filePath = targetFile.absolutePath,
+                    mimeType = "*/*",
+                    isMediaExtraction = false,
+                    connectionCount = 4,
+                    status = TaskStatus.QUEUED
+                )
+                downloadRepository.insertTask(task)
+                _events.emit(HomeUiEvent.ShowToast("Download started: ${targetFile.name}"))
+            } catch (e: Exception) {
+                _events.emit(HomeUiEvent.ShowToast("Failed to start download: ${e.message}"))
+            }
+        }
+    }
+
+    fun pauseTask(taskId: String) = viewModelScope.launch {
+        downloadRepository.pauseTask(taskId)
+    }
+
+    fun resumeTask(taskId: String) = viewModelScope.launch {
+        downloadRepository.resumeTask(taskId)
+    }
+
+    fun cancelTask(taskId: String) = viewModelScope.launch {
+        downloadRepository.cancelTask(taskId)
     }
 
     fun dismissFormatSheet() {

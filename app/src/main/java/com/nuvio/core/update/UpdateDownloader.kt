@@ -17,7 +17,7 @@ class UpdateDownloader(
 
     val updatesDir: File
         get() {
-            val dir = File(context.filesDir, "updates")
+            val dir = context.getExternalFilesDir("updates") ?: File(context.filesDir, "updates")
             if (!dir.exists()) {
                 dir.mkdirs()
             }
@@ -80,7 +80,18 @@ class UpdateDownloader(
 
                 val renamed = tempFile.renameTo(destinationFile)
                 if (!renamed) {
-                    throw RuntimeException("Failed to rename temporary APK to destination")
+                    try {
+                        tempFile.inputStream().use { input ->
+                            destinationFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        tempFile.delete()
+                    } catch (e: Exception) {
+                        tempFile.delete()
+                        destinationFile.delete()
+                        throw RuntimeException("Failed to finalize update APK: ${e.message}", e)
+                    }
                 }
 
                 destinationFile

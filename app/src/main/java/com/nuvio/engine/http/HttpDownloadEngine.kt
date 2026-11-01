@@ -7,6 +7,7 @@ import com.nuvio.domain.model.DownloadSegment
 import com.nuvio.domain.model.DownloadTask
 import com.nuvio.domain.model.SegmentStatus
 import com.nuvio.domain.model.TaskStatus
+import com.nuvio.service.download.DownloadExecutionCoordinator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +32,8 @@ class HttpDownloadEngine(
     private val prober: HttpRangeProber,
     private val taskDao: DownloadTaskDao,
     private val segmentDao: DownloadSegmentDao,
-    private val fileManager: FileManager
+    private val fileManager: FileManager,
+    private val executionCoordinator: DownloadExecutionCoordinator? = null
 ) {
 
     private val activeJobs = ConcurrentHashMap<String, Job>()
@@ -41,6 +43,8 @@ class HttpDownloadEngine(
 
     fun startDownload(task: DownloadTask, maxConnections: Int = 4) {
         if (isTaskActive(task.id)) return
+
+        executionCoordinator?.ensureTransferExecution()
 
         val job = engineScope.launch {
             try {
@@ -52,6 +56,9 @@ class HttpDownloadEngine(
                 taskDao.updateTaskStatus(task.id, TaskStatus.FAILED, e.localizedMessage ?: "Network error")
             } finally {
                 activeJobs.remove(task.id)
+                if (activeJobs.isEmpty()) {
+                    executionCoordinator?.stopTransferExecution()
+                }
             }
         }
         activeJobs[task.id] = job
@@ -60,6 +67,9 @@ class HttpDownloadEngine(
     fun pauseDownload(taskId: String) {
         activeJobs[taskId]?.cancel()
         activeJobs.remove(taskId)
+        if (activeJobs.isEmpty()) {
+            executionCoordinator?.stopTransferExecution()
+        }
         engineScope.launch {
             taskDao.updateTaskStatus(taskId, TaskStatus.PAUSED)
         }
@@ -68,6 +78,9 @@ class HttpDownloadEngine(
     fun cancelDownload(taskId: String) {
         activeJobs[taskId]?.cancel()
         activeJobs.remove(taskId)
+        if (activeJobs.isEmpty()) {
+            executionCoordinator?.stopTransferExecution()
+        }
         engineScope.launch {
             taskDao.updateTaskStatus(taskId, TaskStatus.CANCELLED)
             fileManager.cleanTempFiles(taskId)
@@ -83,6 +96,7 @@ class HttpDownloadEngine(
         val supportsRanges = probe?.supportsRanges ?: false
         val etag = probe?.etag ?: task.etag
         val lastModified = probe?.lastModified ?: task.lastModified
+        val resolvedUrl = probe?.resolvedUrl?.takeIf { it.isNotBlank() } ?: task.url
 
         // Check if server resource changed on resume
         if (task.etag != null && etag != null && task.etag != etag) {
@@ -102,6 +116,7 @@ class HttpDownloadEngine(
                     etag = etag,
                     lastModified = lastModified
                 ),
+                resolvedUrl = resolvedUrl,
                 tempFile = tempFile,
                 targetFile = targetFile,
                 maxConnections = maxConnections.coerceIn(1, 8)
@@ -109,6 +124,7 @@ class HttpDownloadEngine(
         } else {
             downloadSingleStream(
                 task = task.copy(totalBytes = totalBytes, supportsRanges = false),
+                resolvedUrl = resolvedUrl,
                 tempFile = tempFile,
                 targetFile = targetFile
             )
@@ -117,10 +133,11 @@ class HttpDownloadEngine(
 
     private suspend fun downloadWithSegments(
         task: DownloadTask,
+        resolvedUrl: String,
         tempFile: File,
         targetFile: File,
         maxConnections: Int
-    ) = coroutineScope {
+    ): Unit = coroutineScope {
         taskDao.updateTaskStatus(task.id, TaskStatus.DOWNLOADING)
 
         // Pre-allocate temp file
@@ -163,14 +180,13 @@ class HttpDownloadEngine(
                 val worker = SegmentWorker(
                     client = client,
                     segment = segment,
-                    url = task.url,
+                    url = resolvedUrl,
                     destinationFile = tempFile,
-                    onProgress = { bytesWritten, status ->
-                        val diff = bytesWritten - segment.downloadedBytes
-                        val currentTotal = totalDownloadedAtomic.addAndGet(diff)
+                    onProgress = { currentSegmentDownloaded, status, delta ->
+                        val currentTotal = totalDownloadedAtomic.addAndGet(delta)
                         val speed = speedTracker.update(currentTotal)
 
-                        segmentDao.updateSegmentProgress(segment.id, bytesWritten, status)
+                        segmentDao.updateSegmentProgress(segment.id, currentSegmentDownloaded, status)
                         taskDao.updateTaskProgress(task.id, currentTotal, speed, TaskStatus.DOWNLOADING)
                     }
                 )
@@ -188,18 +204,27 @@ class HttpDownloadEngine(
                 taskDao.updateTaskStatus(task.id, TaskStatus.FAILED, "Failed to move completed file")
             }
         } else {
-            taskDao.updateTaskStatus(task.id, TaskStatus.PAUSED)
+            if (coroutineContext.isActive) {
+                // Segment download encountered an unrecoverable failure (e.g. range rejection);
+                // clean segments and fall back automatically to single-stream download
+                segmentDao.deleteSegmentsForTask(task.id)
+                if (tempFile.exists()) tempFile.delete()
+                downloadSingleStream(task.copy(supportsRanges = false), resolvedUrl, tempFile, targetFile)
+            } else {
+                taskDao.updateTaskStatus(task.id, TaskStatus.PAUSED)
+            }
         }
     }
 
     private suspend fun downloadSingleStream(
         task: DownloadTask,
+        resolvedUrl: String,
         tempFile: File,
         targetFile: File
     ) = withContext(Dispatchers.IO) {
         taskDao.updateTaskStatus(task.id, TaskStatus.DOWNLOADING)
 
-        val request = Request.Builder().url(task.url).build()
+        val request = Request.Builder().url(resolvedUrl).build()
         val speedTracker = SpeedTracker()
         speedTracker.reset(0L)
 
@@ -212,6 +237,11 @@ class HttpDownloadEngine(
             val body = response.body ?: run {
                 taskDao.updateTaskStatus(task.id, TaskStatus.FAILED, "Empty response")
                 return@withContext
+            }
+
+            val resolvedTotal = if (task.totalBytes > 0) task.totalBytes else body.contentLength()
+            if (resolvedTotal > 0 && resolvedTotal != task.totalBytes) {
+                taskDao.updateTask(task.copy(totalBytes = resolvedTotal))
             }
 
             val inputStream = body.byteStream()
@@ -236,7 +266,8 @@ class HttpDownloadEngine(
 
             val success = fileManager.finalizeDownload(tempFile, targetFile)
             if (success) {
-                taskDao.updateTaskProgress(task.id, downloaded, 0L, TaskStatus.COMPLETED)
+                val finalTotal = if (resolvedTotal > 0) resolvedTotal else downloaded
+                taskDao.updateTaskProgress(task.id, finalTotal, 0L, TaskStatus.COMPLETED)
             } else {
                 taskDao.updateTaskStatus(task.id, TaskStatus.FAILED, "Failed to move completed file")
             }

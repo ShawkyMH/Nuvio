@@ -22,10 +22,11 @@ class FileManager(private val context: Context) {
 
     /**
      * Staging directory for temporary segment files.
+     * Placed within downloadsDir when available so file moves are atomic and on the same mount.
      */
     val tempDir: File
         get() {
-            val dir = File(context.cacheDir, "staging")
+            val dir = File(downloadsDir, ".staging")
             if (!dir.exists()) {
                 dir.mkdirs()
             }
@@ -64,14 +65,38 @@ class FileManager(private val context: Context) {
     }
 
     /**
-     * Safely renames the temp file to the final target file.
+     * Safely finalizes the temp file to the final target file.
+     * Tries atomic rename first; if cross-device/filesystem link occurs, falls back to stream copying.
      */
     fun finalizeDownload(tempFile: File, targetFile: File): Boolean {
         if (!tempFile.exists()) return false
+
+        val parent = targetFile.parentFile
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs()
+        }
+
         if (targetFile.exists()) {
             targetFile.delete()
         }
-        return tempFile.renameTo(targetFile)
+
+        // 1. Try atomic filesystem rename
+        if (tempFile.renameTo(targetFile)) {
+            return true
+        }
+
+        // 2. Fallback for cross-device mount moves (e.g. internal cache to external SD)
+        return try {
+            tempFile.inputStream().buffered().use { input ->
+                targetFile.outputStream().buffered().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            tempFile.delete()
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**

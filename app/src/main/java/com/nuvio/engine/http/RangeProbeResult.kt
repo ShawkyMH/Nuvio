@@ -6,5 +6,6 @@ data class RangeProbeResult(
     val etag: String?,
     val lastModified: String?,
     val mimeType: String,
-    val suggestedFileName: String?
+    val suggestedFileName: String?,
+    val resolvedUrl: String = ""
 )

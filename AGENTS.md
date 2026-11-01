@@ -25,3 +25,28 @@ This project is built and maintained by a senior multi-disciplinary Android engi
 5. **Safe File IO:** Always sanitize file names using `FilenameUtils.sanitizeFileName` to prevent directory traversal (`../` exploits). Always perform atomic renames (`.tmp` -> target file).
 6. **Exception Handling:** Never swallow exceptions silently. Log structured errors and map them to domain `DownloadError` or `AppResult.Failure` types.
 7. **No God Classes:** Keep classes focused on a single responsibility. DAOs, repositories, use cases, and view models must adhere strictly to SOLID principles.
+
+---
+
+## Continuous GitHub Publishing Workflow & Release Discipline
+
+8. **Permanent Continuous Publishing:**
+   - Every completed change—whether a bug fix, new feature, architectural refactor, UI adjustment, or dependency update—MUST be published to GitHub.
+   - Never leave completed work uncommitted, unpushed, or unreleased.
+9. **Semantic Versioning & Version Code Bumping:**
+   - Every release requires bumping version information in `app/build.gradle.kts` and `UpdateState.kt`:
+     - **PATCH** (`x.y.Z`): For backwards-compatible bug fixes, minor reliability/performance improvements, and internal refactors. Increment `versionCode` by 1.
+     - **MINOR** (`x.Y.0`): For new backwards-compatible user-facing features, new screens, or major capabilities. Increment `versionCode` by 1.
+     - **MAJOR** (`X.0.0`): For breaking architectural changes, major database schema migrations, or fundamental UI redesigns. Increment `versionCode` by 1.
+   - `versionCode` MUST strictly monotonically increase with each release.
+10. **Git Commit & Push Hygiene:**
+    - Always inspect `git status` and `git diff` before committing.
+    - Use Conventional Commit format: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
+    - Never commit secrets, keys, local environment configs, or unverified work.
+    - Push directly to `origin main` and push semantic tags (`vX.Y.Z`).
+11. **Release Asset Packaging & Verification:**
+    - Every GitHub release MUST attach:
+      - Signed/assembled release APK: `nuvio-vX.Y.Z.apk`.
+      - Cryptographic checksum: `nuvio-vX.Y.Z.apk.sha256`.
+      - Detailed release notes outlining changes, fixes, and verification steps.
+    - The in-app update check must be verified against GitHub Releases API to guarantee users receive instant update notifications.

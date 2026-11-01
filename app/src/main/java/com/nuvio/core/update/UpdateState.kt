@@ -17,8 +17,8 @@ enum class UpdateStatus {
 data class UpdateState(
     val status: UpdateStatus = UpdateStatus.IDLE,
     val updateInfo: UpdateInfo? = null,
-    val currentVersionName: String = "1.1.0",
-    val currentVersionCode: Long = 2L,
+    val currentVersionName: String = "1.1.1",
+    val currentVersionCode: Long = 3L,
     val downloadProgressPercent: Int = 0,
     val downloadedBytes: Long = 0L,
     val totalBytes: Long = 0L,
