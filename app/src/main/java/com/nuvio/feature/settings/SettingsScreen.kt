@@ -19,13 +19,19 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -34,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,15 +49,33 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nuvio.core.update.UpdateDialog
+import com.nuvio.core.update.UpdateStatus
+import com.nuvio.core.update.UpdateUiEvent
+import com.nuvio.core.update.UpdateViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    updateViewModel: UpdateViewModel,
     modifier: Modifier = Modifier
 ) {
     val settings by viewModel.settings.collectAsState()
+    val updateState by updateViewModel.updateState.collectAsState()
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        updateViewModel.events.collect { event ->
+            when (event) {
+                is UpdateUiEvent.ShowToast -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                is UpdateUiEvent.RequirePermission -> context.startActivity(event.intent)
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -300,6 +325,109 @@ fun SettingsScreen(
                 }
             }
 
+            // App Updates Section
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                SettingsSectionHeader(title = "App Updates")
+            }
+
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.SystemUpdate,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.size(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Nuvio Version ${updateState.currentVersionName}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    val statusText = when (updateState.status) {
+                                        UpdateStatus.CHECKING -> "Checking for updates..."
+                                        UpdateStatus.UPDATE_AVAILABLE -> "Update available (v${updateState.updateInfo?.versionName})"
+                                        UpdateStatus.UP_TO_DATE -> "App is up to date"
+                                        UpdateStatus.DOWNLOADING -> "Downloading update (${updateState.downloadProgressPercent}%)"
+                                        UpdateStatus.VERIFYING -> "Verifying update checksum..."
+                                        UpdateStatus.READY_TO_INSTALL -> "Ready to install"
+                                        UpdateStatus.INSTALLING -> "Installing update..."
+                                        UpdateStatus.FAILED -> updateState.errorMessage ?: "Check failed"
+                                        UpdateStatus.IDLE -> "Build ${updateState.currentVersionCode}"
+                                    }
+                                    Text(
+                                        text = statusText,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (updateState.status == UpdateStatus.UPDATE_AVAILABLE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            if (updateState.status == UpdateStatus.CHECKING) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                IconButton(onClick = { updateViewModel.checkForUpdates(manual = true) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Check for Updates",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+
+                        if (updateState.lastCheckedTimestamp > 0) {
+                            val timeStr = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(updateState.lastCheckedTimestamp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Last checked: $timeStr",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+
+                        if (updateState.status == UpdateStatus.UPDATE_AVAILABLE || updateState.status == UpdateStatus.READY_TO_INSTALL) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    if (updateState.status == UpdateStatus.READY_TO_INSTALL) {
+                                        updateViewModel.installUpdate()
+                                    } else {
+                                        updateViewModel.downloadUpdate()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = if (updateState.status == UpdateStatus.READY_TO_INSTALL) "Install Update" else "Download Update (v${updateState.updateInfo?.versionName})"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // About Section
             item {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -317,7 +445,7 @@ fun SettingsScreen(
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        ComponentInfoRow(name = "Application", version = "Nuvio 1.0.0 (Build 1)")
+                        ComponentInfoRow(name = "Application", version = "Nuvio ${updateState.currentVersionName} (Build ${updateState.currentVersionCode})")
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Licensed under Apache 2.0. Clean-room implementation inspired by Snaptube, VRKA, and ADM.",
@@ -329,6 +457,16 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+
+    if (updateState.showUpdateDialog && updateState.updateInfo != null) {
+        UpdateDialog(
+            state = updateState,
+            onDownloadClick = updateViewModel::downloadUpdate,
+            onInstallClick = updateViewModel::installUpdate,
+            onCancelClick = updateViewModel::cancelDownload,
+            onDismiss = updateViewModel::dismissDialog
+        )
     }
 }
 

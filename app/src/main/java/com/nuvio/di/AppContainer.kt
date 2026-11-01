@@ -7,6 +7,11 @@ import com.nuvio.core.database.NuvioDatabaseHelper
 import com.nuvio.core.database.PlaybackHistoryDao
 import com.nuvio.core.network.NetworkClientProvider
 import com.nuvio.core.storage.FileManager
+import com.nuvio.core.update.ApkInstaller
+import com.nuvio.core.update.GitHubReleaseDataSource
+import com.nuvio.core.update.UpdateDownloader
+import com.nuvio.core.update.UpdateRepository
+import com.nuvio.core.update.UpdateRepositoryImpl
 import com.nuvio.data.repository.DownloadRepositoryImpl
 import com.nuvio.data.repository.MediaRepositoryImpl
 import com.nuvio.data.repository.PlaybackRepositoryImpl
@@ -87,5 +92,26 @@ class AppContainer(private val context: Context) {
 
     val mediaRepository: MediaRepository by lazy {
         MediaRepositoryImpl(ytDlpEngine)
+    }
+
+    val gitHubReleaseDataSource: GitHubReleaseDataSource by lazy {
+        GitHubReleaseDataSource(okHttpClient)
+    }
+
+    val updateDownloader: UpdateDownloader by lazy {
+        UpdateDownloader(okHttpClient, context)
+    }
+
+    val apkInstaller: ApkInstaller by lazy {
+        ApkInstaller(context)
+    }
+
+    val updateRepository: UpdateRepository by lazy {
+        UpdateRepositoryImpl(
+            context = context,
+            releaseDataSource = gitHubReleaseDataSource,
+            downloader = updateDownloader,
+            installer = apkInstaller
+        )
     }
 }

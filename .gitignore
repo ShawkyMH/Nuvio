@@ -17,3 +17,7 @@ build/
 *.ap_
 *.dex
 *.class
+*.keystore
+*.jks
+*.base64.txt
+signing.properties

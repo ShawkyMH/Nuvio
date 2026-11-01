@@ -21,6 +21,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.nuvio.NuvioApp
 import com.nuvio.core.designsystem.component.NuvioBottomNavigation
+import com.nuvio.core.update.UpdateViewModel
 import com.nuvio.feature.browser.BrowserScreen
 import com.nuvio.feature.browser.BrowserViewModel
 import com.nuvio.feature.downloads.DownloadsScreen
@@ -79,6 +80,12 @@ fun NuvioAppScaffold(
         SettingsViewModel(
             settingsRepository = container.settingsRepository,
             playbackRepository = container.playbackRepository
+        )
+    }
+
+    val updateViewModel = remember {
+        UpdateViewModel(
+            repository = container.updateRepository
         )
     }
 
@@ -170,7 +177,10 @@ fun NuvioAppScaffold(
                 }
 
                 composable(Destination.SETTINGS.route) {
-                    SettingsScreen(viewModel = settingsViewModel)
+                    SettingsScreen(
+                        viewModel = settingsViewModel,
+                        updateViewModel = updateViewModel
+                    )
                 }
             }
         }
