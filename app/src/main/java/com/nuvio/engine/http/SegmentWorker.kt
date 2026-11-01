@@ -1,0 +1,81 @@
+package com.nuvio.engine.http
+
+import com.nuvio.domain.model.DownloadSegment
+import com.nuvio.domain.model.SegmentStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.io.RandomAccessFile
+import kotlin.coroutines.coroutineContext
+
+class SegmentWorker(
+    private val client: OkHttpClient,
+    private val segment: DownloadSegment,
+    private val url: String,
+    private val destinationFile: File,
+    private val onProgress: suspend (bytesWritten: Long, status: SegmentStatus) -> Unit
+) {
+
+    suspend fun execute(): Boolean = withContext(Dispatchers.IO) {
+        val currentOffset = segment.startByte + segment.downloadedBytes
+        if (currentOffset > segment.endByte) {
+            onProgress(segment.downloadedBytes, SegmentStatus.COMPLETED)
+            return@withContext true
+        }
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Range", "bytes=$currentOffset-${segment.endByte}")
+            .build()
+
+        var raf: RandomAccessFile? = null
+        try {
+            onProgress(segment.downloadedBytes, SegmentStatus.DOWNLOADING)
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful && response.code != 206) {
+                    onProgress(segment.downloadedBytes, SegmentStatus.FAILED)
+                    return@withContext false
+                }
+
+                val body = response.body ?: run {
+                    onProgress(segment.downloadedBytes, SegmentStatus.FAILED)
+                    return@withContext false
+                }
+
+                raf = RandomAccessFile(destinationFile, "rw")
+                raf!!.seek(currentOffset)
+
+                val inputStream = body.byteStream()
+                val buffer = ByteArray(16384) // 16 KB chunks
+                var totalSegmentDownloaded = segment.downloadedBytes
+                var read = 0
+
+                while (coroutineContext.isActive && inputStream.read(buffer).also { read = it } != -1) {
+                    raf!!.write(buffer, 0, read)
+                    totalSegmentDownloaded += read
+                    onProgress(totalSegmentDownloaded, SegmentStatus.DOWNLOADING)
+                }
+
+                if (!coroutineContext.isActive) {
+                    // Task was cancelled or paused
+                    return@withContext false
+                }
+
+                val isComplete = totalSegmentDownloaded >= segment.totalBytes
+                val finalStatus = if (isComplete) SegmentStatus.COMPLETED else SegmentStatus.FAILED
+                onProgress(totalSegmentDownloaded, finalStatus)
+                return@withContext isComplete
+            }
+        } catch (e: Exception) {
+            if (coroutineContext.isActive) {
+                onProgress(segment.downloadedBytes, SegmentStatus.FAILED)
+            }
+            return@withContext false
+        } finally {
+            runCatching { raf?.close() }
+        }
+    }
+}
