@@ -23,6 +23,7 @@ import com.nuvio.domain.repository.SettingsRepository
 import com.nuvio.engine.ffmpeg.FfmpegProcessor
 import com.nuvio.engine.http.HttpDownloadEngine
 import com.nuvio.engine.http.HttpRangeProber
+import com.nuvio.engine.media.YouTubeStreamExtractor
 import com.nuvio.engine.ytdlp.YtDlpEngine
 import com.nuvio.service.download.DownloadExecutionCoordinator
 
@@ -102,8 +103,15 @@ class AppContainer(private val context: Context) {
         )
     }
 
+    val youTubeExtractor: YouTubeStreamExtractor by lazy {
+        YouTubeStreamExtractor(okHttpClient)
+    }
+
     val mediaRepository: MediaRepository by lazy {
-        MediaRepositoryImpl(ytDlpEngine)
+        MediaRepositoryImpl(
+            ytDlpEngine = ytDlpEngine,
+            youTubeExtractor = youTubeExtractor
+        )
     }
 
     val gitHubReleaseDataSource: GitHubReleaseDataSource by lazy {

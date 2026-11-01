@@ -244,10 +244,14 @@ class HttpDownloadEngine(
     ) = withContext(Dispatchers.IO) {
         taskDao.updateTaskStatus(task.id, TaskStatus.DOWNLOADING)
 
-        val request = Request.Builder()
+        val reqBuilder = Request.Builder()
             .url(resolvedUrl)
             .header("Accept-Encoding", "identity")
-            .build()
+
+        if (resolvedUrl.contains("googlevideo.com")) {
+            reqBuilder.header("User-Agent", "com.google.android.youtube/19.09.37 (Linux; U; Android 14; en_US) gzip")
+        }
+        val request = reqBuilder.build()
         val speedTracker = SpeedTracker()
         speedTracker.reset(0L)
 

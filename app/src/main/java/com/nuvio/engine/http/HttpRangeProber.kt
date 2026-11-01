@@ -11,10 +11,15 @@ class HttpRangeProber(private val client: OkHttpClient) {
     suspend fun probe(url: String): Result<RangeProbeResult> = withContext(Dispatchers.IO) {
         runCatching {
             // First attempt: GET with Range 0-0 to check range slicing and Content-Range
-            val rangeRequest = Request.Builder()
+            val reqBuilder = Request.Builder()
                 .url(url)
                 .header("Range", "bytes=0-0")
-                .build()
+                .header("Accept-Encoding", "identity")
+
+            if (url.contains("googlevideo.com")) {
+                reqBuilder.header("User-Agent", "com.google.android.youtube/19.09.37 (Linux; U; Android 14; en_US) gzip")
+            }
+            val rangeRequest = reqBuilder.build()
 
             client.newCall(rangeRequest).execute().use { response ->
                 val code = response.code

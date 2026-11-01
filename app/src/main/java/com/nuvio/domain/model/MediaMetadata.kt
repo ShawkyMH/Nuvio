@@ -13,7 +13,8 @@ data class FormatOption(
     val bitrateKbps: Int = 0,
     val container: String = "mp4",
     val estimatedBytes: Long = -1L,
-    val isDirectStream: Boolean = true
+    val isDirectStream: Boolean = true,
+    val streamUrl: String? = null
 )
 
 data class MediaMetadata(

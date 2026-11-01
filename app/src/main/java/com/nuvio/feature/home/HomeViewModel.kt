@@ -132,21 +132,24 @@ class HomeViewModel(
         dismissFormatSheet()
 
         viewModelScope.launch {
-            val fileName = "${media.title}.${format.container}"
+            val cleanTitle = media.title.replace(Regex("""[\\/:*?"<>|]"""), "_").trim()
+            val fileName = "$cleanTitle.${format.container}"
             val targetFile = fileManager.createTargetFile(fileName)
+            val downloadUrl = format.streamUrl?.takeIf { it.isNotBlank() } ?: media.url
             val task = DownloadTask(
                 id = UUID.randomUUID().toString(),
-                url = media.url,
-                title = media.title,
+                url = downloadUrl,
+                title = cleanTitle,
                 filePath = targetFile.absolutePath,
                 mimeType = if (format.formatType == com.nuvio.domain.model.FormatType.AUDIO) "audio/*" else "video/*",
-                isMediaExtraction = true,
+                isMediaExtraction = false,
                 formatId = format.id,
+                totalBytes = if (format.estimatedBytes > 0) format.estimatedBytes else 0L,
                 connectionCount = settingsRepository?.settingsFlow?.value?.connectionsPerDownload ?: 4,
                 status = TaskStatus.QUEUED
             )
             downloadRepository.insertTask(task)
-            _events.emit(HomeUiEvent.ShowToast("Download started: ${media.title}"))
+            _events.emit(HomeUiEvent.ShowToast("Download started: $cleanTitle"))
         }
     }
 }

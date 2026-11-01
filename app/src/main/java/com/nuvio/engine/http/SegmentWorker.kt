@@ -26,11 +26,15 @@ class SegmentWorker(
             return@withContext true
         }
 
-        val request = Request.Builder()
+        val reqBuilder = Request.Builder()
             .url(url)
             .header("Range", "bytes=$currentOffset-${segment.endByte}")
             .header("Accept-Encoding", "identity")
-            .build()
+
+        if (url.contains("googlevideo.com")) {
+            reqBuilder.header("User-Agent", "com.google.android.youtube/19.09.37 (Linux; U; Android 14; en_US) gzip")
+        }
+        val request = reqBuilder.build()
 
         var raf: RandomAccessFile? = null
         try {

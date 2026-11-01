@@ -11,8 +11,8 @@ android {
         applicationId = "com.nuvio"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -22,16 +22,19 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePath = project.findProperty("KEYSTORE_FILE")?.toString()
-                ?: System.getenv("KEYSTORE_FILE")
-            if (!keystorePath.isNullOrBlank() && file(keystorePath).exists()) {
-                storeFile = file(keystorePath)
+            val envPath = project.findProperty("KEYSTORE_FILE")?.toString() ?: System.getenv("KEYSTORE_FILE")
+            val defaultKeystore = rootProject.file("keystore/nuvio-release.jks")
+            val targetFile = if (!envPath.isNullOrBlank() && file(envPath).exists()) file(envPath) else defaultKeystore
+            if (targetFile.exists()) {
+                storeFile = targetFile
                 storePassword = project.findProperty("KEYSTORE_PASSWORD")?.toString()
-                    ?: System.getenv("KEYSTORE_PASSWORD")
+                    ?: System.getenv("KEYSTORE_PASSWORD") ?: "nuvio2026release"
                 keyAlias = project.findProperty("KEY_ALIAS")?.toString()
-                    ?: System.getenv("KEY_ALIAS")
+                    ?: System.getenv("KEY_ALIAS") ?: "nuvio"
                 keyPassword = project.findProperty("KEY_PASSWORD")?.toString()
-                    ?: System.getenv("KEY_PASSWORD")
+                    ?: System.getenv("KEY_PASSWORD") ?: "nuvio2026release"
+                enableV1Signing = true
+                enableV2Signing = true
             }
         }
     }
@@ -43,8 +46,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            val releaseConfig = signingConfigs.getByName("release")
-            signingConfig = if (releaseConfig.storeFile != null) releaseConfig else signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

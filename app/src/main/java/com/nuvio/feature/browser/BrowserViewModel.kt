@@ -105,12 +105,13 @@ class BrowserViewModel(
         dismissDetectedMedia()
 
         viewModelScope.launch {
+            val rawTitle = candidate.pageTitle?.replace(Regex("""[\\/:*?"<>|]"""), "_")?.trim()
             val fileName = UrlValidator.extractFileNameFromUrl(candidate.url, fallback = "media_${System.currentTimeMillis()}.mp4")
-            val targetFile = fileManager.createTargetFile(fileName)
+            val targetFile = fileManager.createTargetFile(if (!rawTitle.isNullOrBlank()) "$rawTitle.mp4" else fileName)
             val task = DownloadTask(
                 id = UUID.randomUUID().toString(),
                 url = candidate.url,
-                title = candidate.pageTitle ?: fileName,
+                title = if (!rawTitle.isNullOrBlank()) rawTitle else fileName,
                 filePath = targetFile.absolutePath,
                 mimeType = candidate.mimeType ?: "video/*",
                 isMediaExtraction = false,
