@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base Nuvio Application Theme -->
+    <style name="Theme.Nuvio" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/brand_white</item>
+        <item name="android:navigationBarColor">@color/brand_white</item>
+    </style>
+
+    <!-- Nuvio Splash Theme (Android 12+ Official SplashScreen API) -->
+    <style name="Theme.Nuvio.Starting" parent="Theme.Nuvio">
+        <item name="android:windowSplashScreenBackground">@color/brand_white</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/nuvio_symbol</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/brand_white</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+</resources>

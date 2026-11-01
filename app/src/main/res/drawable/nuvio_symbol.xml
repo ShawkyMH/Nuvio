@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="142dp"
+    android:height="113dp"
+    android:viewportWidth="142"
+    android:viewportHeight="113">
+    <!-- Nuvio Official Symbol -->
+    <path
+        android:fillColor="#216DC1"
+        android:pathData="M 26.50,1.00 L 55.00,1.00 L 35.00,111.00 L 5.50,111.00 C 2.00,111.00 0.00,108.50 0.50,105.00 L 19.50,6.50 C 20.20,2.80 23.00,1.00 26.50,1.00 Z" />
+    <path
+        android:fillColor="#216DC1"
+        android:pathData="M 105.00,1.00 L 134.50,1.00 C 138.00,1.00 141.00,3.50 140.50,7.00 L 122.50,105.50 C 122.00,109.00 119.00,111.00 115.50,111.00 L 84.00,111.00 L 94.00,51.00 L 105.00,1.00 Z" />
+    <path
+        android:fillColor="#287FE8"
+        android:pathData="M 20.00,1.00 L 55.00,1.00 L 120.00,111.00 L 84.00,111.00 Z" />
+    <path
+        android:fillColor="#F9B814"
+        android:pathData="M 63.38 42.00 L 62.00 43.38 L 62.00 69.50 L 66.50 69.88 L 68.38 67.88 L 73.50 65.88 L 75.38 63.88 L 83.50 59.88 L 85.88 57.50 L 85.88 55.38 L 82.50 52.00 L 77.38 50.00 L 72.50 46.00 L 67.38 44.00 L 65.50 42.00 Z" />
+</vector>

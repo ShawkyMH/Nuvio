@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Nuvio Official Brand Identity Palette (Approved Reference) -->
+    <color name="brand_primary_blue">#287FE8</color>
+    <color name="brand_stem_blue">#216DC1</color>
+    <color name="brand_yellow">#F9B814</color>
+    <color name="brand_charcoal">#2E373E</color>
+    <color name="brand_dark_navy">#0C213C</color>
+    <color name="brand_dark_ribbon">#EBF4FB</color>
+    <color name="brand_dark_stem">#BCDBFA</color>
+    <color name="brand_white">#FFFFFF</color>
+</resources>

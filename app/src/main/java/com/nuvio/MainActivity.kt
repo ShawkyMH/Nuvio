@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
     ) { /* Permission granted or denied */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.Theme_Nuvio)
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 

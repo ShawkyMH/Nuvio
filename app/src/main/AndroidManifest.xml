@@ -18,12 +18,13 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:theme="@style/Theme.Nuvio"
         android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:theme="@style/Theme.Nuvio.Starting"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:supportsPictureInPicture="true"
             android:windowSoftInputMode="adjustResize">

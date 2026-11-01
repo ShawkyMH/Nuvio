@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base Nuvio Application Theme (Night) -->
+    <style name="Theme.Nuvio" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/brand_dark_navy</item>
+        <item name="android:navigationBarColor">@color/brand_dark_navy</item>
+    </style>
+
+    <!-- Nuvio Splash Theme (Android 12+ Night) -->
+    <style name="Theme.Nuvio.Starting" parent="Theme.Nuvio">
+        <item name="android:windowSplashScreenBackground">@color/brand_dark_navy</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/nuvio_symbol</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/brand_dark_navy</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+</resources>

@@ -21,3 +21,4 @@ build/
 *.jks
 *.base64.txt
 signing.properties
+scratch/

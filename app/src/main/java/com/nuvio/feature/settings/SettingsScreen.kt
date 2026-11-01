@@ -1,7 +1,11 @@
 package com.nuvio.feature.settings
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,9 +15,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -47,8 +53,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.nuvio.R
 import com.nuvio.core.update.UpdateDialog
 import com.nuvio.core.update.UpdateStatus
 import com.nuvio.core.update.UpdateUiEvent
@@ -431,10 +440,12 @@ fun SettingsScreen(
             // About Section
             item {
                 Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "About")
+                SettingsSectionHeader(title = "About Nuvio")
             }
 
             item {
+                val isDark = isSystemInDarkTheme()
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -444,13 +455,70 @@ fun SettingsScreen(
                         containerColor = MaterialTheme.colorScheme.surface
                     )
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        ComponentInfoRow(name = "Application", version = "Nuvio ${updateState.currentVersionName} (Build ${updateState.currentVersionCode})")
-                        Spacer(modifier = Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Image(
+                            painter = painterResource(
+                                id = if (isDark) R.drawable.nuvio_logo_dark else R.drawable.nuvio_logo_light
+                            ),
+                            contentDescription = "Nuvio Logo",
+                            modifier = Modifier
+                                .height(52.dp)
+                                .padding(vertical = 4.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
                         Text(
-                            text = "Licensed under Apache 2.0. Clean-room implementation inspired by Snaptube, VRKA, and ADM.",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = "Premium Media Downloader & Player",
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        ComponentInfoRow(
+                            name = "Application Version",
+                            version = "v${updateState.currentVersionName} (Build ${updateState.currentVersionCode})"
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        ComponentInfoRow(
+                            name = "License",
+                            version = "Apache 2.0"
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ShawkyMH/Nuvio"))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Code,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("GitHub Repository")
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "Clean-room implementation inspired by Snaptube, VRKA, and ADM. Built with Material 3 & Jetpack Compose.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
