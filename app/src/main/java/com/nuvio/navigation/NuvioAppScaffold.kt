@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -22,6 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import com.nuvio.NuvioApp
 import com.nuvio.core.designsystem.component.NuvioBottomNavigation
 import com.nuvio.core.update.UpdateViewModel
+import com.nuvio.core.util.FileOpener
 import com.nuvio.feature.browser.BrowserScreen
 import com.nuvio.feature.browser.BrowserViewModel
 import com.nuvio.feature.downloads.DownloadsScreen
@@ -53,21 +55,24 @@ fun NuvioAppScaffold(
         HomeViewModel(
             downloadRepository = container.downloadRepository,
             mediaRepository = container.mediaRepository,
-            fileManager = container.fileManager
+            fileManager = container.fileManager,
+            settingsRepository = container.settingsRepository
         )
     }
 
     val downloadsViewModel = remember {
         DownloadsViewModel(
             repository = container.downloadRepository,
-            fileManager = container.fileManager
+            fileManager = container.fileManager,
+            settingsRepository = container.settingsRepository
         )
     }
 
     val browserViewModel = remember {
         BrowserViewModel(
             downloadRepository = container.downloadRepository,
-            fileManager = container.fileManager
+            fileManager = container.fileManager,
+            settingsRepository = container.settingsRepository
         )
     }
 
@@ -93,13 +98,26 @@ fun NuvioAppScaffold(
     val playerViewModel = remember {
         PlayerViewModel(
             context = NuvioApp.instance,
-            playbackRepository = container.playbackRepository
+            playbackRepository = container.playbackRepository,
+            settingsRepository = container.settingsRepository
         )
     }
 
     var isPlayerVisible by remember { mutableStateOf(false) }
 
     // Handle shared incoming URL
+    val context = LocalContext.current
+    val handleOpenMediaOrFile: (String, String) -> Unit = { uri, title ->
+        FileOpener.openFile(
+            context = context,
+            filePath = uri,
+            onPlayMedia = { path, mediaTitle ->
+                playerViewModel.playMedia(path, mediaTitle)
+                isPlayerVisible = true
+            }
+        )
+    }
+
     remember(initialSharedUrl) {
         if (!initialSharedUrl.isNullOrBlank()) {
             homeViewModel.onQueryChange(initialSharedUrl)
@@ -146,20 +164,14 @@ fun NuvioAppScaffold(
                         onNavigateToLibrary = {
                             navController.navigate(Destination.LIBRARY.route)
                         },
-                        onPlayMedia = { uri, title ->
-                            playerViewModel.playMedia(uri, title)
-                            isPlayerVisible = true
-                        }
+                        onPlayMedia = handleOpenMediaOrFile
                     )
                 }
 
                 composable(Destination.DOWNLOADS.route) {
                     DownloadsScreen(
                         viewModel = downloadsViewModel,
-                        onPlayMedia = { uri, title ->
-                            playerViewModel.playMedia(uri, title)
-                            isPlayerVisible = true
-                        }
+                        onPlayMedia = handleOpenMediaOrFile
                     )
                 }
 
@@ -170,10 +182,7 @@ fun NuvioAppScaffold(
                 composable(Destination.LIBRARY.route) {
                     LibraryScreen(
                         viewModel = libraryViewModel,
-                        onPlayMedia = { uri, title ->
-                            playerViewModel.playMedia(uri, title)
-                            isPlayerVisible = true
-                        }
+                        onPlayMedia = handleOpenMediaOrFile
                     )
                 }
 

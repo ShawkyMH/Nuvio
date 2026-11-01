@@ -7,6 +7,7 @@ import com.nuvio.core.storage.FileManager
 import com.nuvio.domain.model.DownloadTask
 import com.nuvio.domain.model.TaskStatus
 import com.nuvio.domain.repository.DownloadRepository
+import com.nuvio.domain.repository.SettingsRepository
 import com.nuvio.engine.browser.MediaCandidate
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
 import java.util.UUID
 
 sealed interface BrowserEvent {
@@ -34,10 +36,20 @@ data class BrowserUiState(
 
 class BrowserViewModel(
     private val downloadRepository: DownloadRepository,
-    private val fileManager: FileManager
+    private val fileManager: FileManager,
+    private val settingsRepository: SettingsRepository? = null
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(BrowserUiState())
+    private val defaultHomepage = settingsRepository?.settingsFlow?.value?.browserHomepage?.takeIf { it.isNotBlank() } ?: "https://www.google.com"
+
+    val settingsFlow: StateFlow<com.nuvio.domain.model.AppSettings>? = settingsRepository?.settingsFlow
+
+    private val _uiState = MutableStateFlow(
+        BrowserUiState(
+            currentUrl = defaultHomepage,
+            pageTitle = "Home"
+        )
+    )
     val uiState: StateFlow<BrowserUiState> = _uiState.asStateFlow()
 
     private val _events = MutableSharedFlow<BrowserEvent>()
@@ -47,7 +59,15 @@ class BrowserViewModel(
         val target = if (UrlValidator.isValidUrl(url)) {
             url.trim()
         } else {
-            "https://www.google.com/search?q=${java.net.URLEncoder.encode(url.trim(), "UTF-8")}"
+            val query = URLEncoder.encode(url.trim(), "UTF-8")
+            val engine = settingsRepository?.settingsFlow?.value?.searchEngine ?: "Google"
+            when (engine) {
+                "DuckDuckGo" -> "https://duckduckgo.com/?q=$query"
+                "Bing" -> "https://www.bing.com/search?q=$query"
+                "Yahoo" -> "https://search.yahoo.com/search?p=$query"
+                "Ecosia" -> "https://www.ecosia.org/search?q=$query"
+                else -> "https://www.google.com/search?q=$query"
+            }
         }
         _uiState.value = _uiState.value.copy(currentUrl = target)
     }
@@ -94,7 +114,7 @@ class BrowserViewModel(
                 filePath = targetFile.absolutePath,
                 mimeType = candidate.mimeType ?: "video/*",
                 isMediaExtraction = false,
-                connectionCount = 4,
+                connectionCount = settingsRepository?.settingsFlow?.value?.connectionsPerDownload ?: 4,
                 status = TaskStatus.QUEUED
             )
             downloadRepository.insertTask(task)

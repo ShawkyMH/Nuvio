@@ -1,12 +1,18 @@
 package com.nuvio.engine.http
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.nuvio.core.database.DownloadSegmentDao
 import com.nuvio.core.database.DownloadTaskDao
+import com.nuvio.core.download.DownloadedFileValidator
+import com.nuvio.core.download.ValidationResult
 import com.nuvio.core.storage.FileManager
 import com.nuvio.domain.model.DownloadSegment
 import com.nuvio.domain.model.DownloadTask
 import com.nuvio.domain.model.SegmentStatus
 import com.nuvio.domain.model.TaskStatus
+import com.nuvio.domain.repository.SettingsRepository
 import com.nuvio.service.download.DownloadExecutionCoordinator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -33,7 +39,9 @@ class HttpDownloadEngine(
     private val taskDao: DownloadTaskDao,
     private val segmentDao: DownloadSegmentDao,
     private val fileManager: FileManager,
-    private val executionCoordinator: DownloadExecutionCoordinator? = null
+    private val executionCoordinator: DownloadExecutionCoordinator? = null,
+    private val settingsRepository: SettingsRepository? = null,
+    private val context: Context? = null
 ) {
 
     private val activeJobs = ConcurrentHashMap<String, Job>()
@@ -44,11 +52,21 @@ class HttpDownloadEngine(
     fun startDownload(task: DownloadTask, maxConnections: Int = 4) {
         if (isTaskActive(task.id)) return
 
+        val wifiOnly = settingsRepository?.settingsFlow?.value?.wifiOnly ?: false
+        if (wifiOnly && context != null && !isWifiConnected(context)) {
+            engineScope.launch {
+                taskDao.updateTaskStatus(task.id, TaskStatus.PAUSED, "Paused: Wi-Fi connection required")
+            }
+            return
+        }
+
+        val effectiveConnections = settingsRepository?.settingsFlow?.value?.connectionsPerDownload ?: maxConnections
+
         executionCoordinator?.ensureTransferExecution()
 
         val job = engineScope.launch {
             try {
-                executeTask(task, maxConnections)
+                executeTask(task, effectiveConnections)
             } catch (e: CancellationException) {
                 // Task was paused or cancelled
                 taskDao.updateTaskStatus(task.id, TaskStatus.PAUSED)
@@ -62,6 +80,13 @@ class HttpDownloadEngine(
             }
         }
         activeJobs[task.id] = job
+    }
+
+    private fun isWifiConnected(ctx: Context): Boolean {
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return true
+        val activeNet = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(activeNet) ?: return false
+        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
     fun pauseDownload(taskId: String) {
@@ -196,13 +221,8 @@ class HttpDownloadEngine(
 
         val results = segmentJobs.awaitAll()
         if (results.all { it }) {
-            // All segments completed! Atomic finalize
-            val success = fileManager.finalizeDownload(tempFile, targetFile)
-            if (success) {
-                taskDao.updateTaskProgress(task.id, task.totalBytes, 0L, TaskStatus.COMPLETED)
-            } else {
-                taskDao.updateTaskStatus(task.id, TaskStatus.FAILED, "Failed to move completed file")
-            }
+            // All segments completed! Proceed to finalize and validate
+            finalizeAndValidate(task, tempFile, targetFile, task.totalBytes)
         } else {
             if (coroutineContext.isActive) {
                 // Segment download encountered an unrecoverable failure (e.g. range rejection);
@@ -224,7 +244,10 @@ class HttpDownloadEngine(
     ) = withContext(Dispatchers.IO) {
         taskDao.updateTaskStatus(task.id, TaskStatus.DOWNLOADING)
 
-        val request = Request.Builder().url(resolvedUrl).build()
+        val request = Request.Builder()
+            .url(resolvedUrl)
+            .header("Accept-Encoding", "identity")
+            .build()
         val speedTracker = SpeedTracker()
         speedTracker.reset(0L)
 
@@ -257,6 +280,7 @@ class HttpDownloadEngine(
                     val speed = speedTracker.update(downloaded)
                     taskDao.updateTaskProgress(task.id, downloaded, speed, TaskStatus.DOWNLOADING)
                 }
+                out.flush()
             }
 
             if (!coroutineContext.isActive) {
@@ -264,12 +288,52 @@ class HttpDownloadEngine(
                 return@withContext
             }
 
-            val success = fileManager.finalizeDownload(tempFile, targetFile)
-            if (success) {
-                val finalTotal = if (resolvedTotal > 0) resolvedTotal else downloaded
+            // Check for premature truncation
+            if (resolvedTotal > 0 && downloaded < resolvedTotal) {
+                tempFile.delete()
+                taskDao.updateTaskStatus(
+                    task.id,
+                    TaskStatus.FAILED,
+                    "Transfer prematurely terminated: received $downloaded of $resolvedTotal bytes"
+                )
+                return@withContext
+            }
+
+            finalizeAndValidate(task, tempFile, targetFile, resolvedTotal)
+        }
+    }
+
+    private suspend fun finalizeAndValidate(
+        task: DownloadTask,
+        tempFile: File,
+        targetFile: File,
+        expectedBytes: Long
+    ) {
+        // 1. FINALIZING: Move staging file to target destination
+        taskDao.updateTaskStatus(task.id, TaskStatus.FINALIZING)
+        val success = fileManager.finalizeDownload(tempFile, targetFile)
+        if (!success) {
+            taskDao.updateTaskStatus(task.id, TaskStatus.FAILED, "Failed to move completed file to destination")
+            return
+        }
+
+        // 2. VALIDATING: Check completeness, non-emptiness, magic bytes, and absence of HTML errors
+        taskDao.updateTaskStatus(task.id, TaskStatus.VALIDATING)
+        val validation = DownloadedFileValidator.validate(
+            file = targetFile,
+            expectedTotalBytes = expectedBytes,
+            mimeType = task.mimeType
+        )
+
+        when (validation) {
+            is ValidationResult.Valid -> {
+                val finalTotal = if (expectedBytes > 0) expectedBytes else targetFile.length()
                 taskDao.updateTaskProgress(task.id, finalTotal, 0L, TaskStatus.COMPLETED)
-            } else {
-                taskDao.updateTaskStatus(task.id, TaskStatus.FAILED, "Failed to move completed file")
+            }
+            is ValidationResult.Invalid -> {
+                // Delete invalid or corrupted file to protect user storage
+                runCatching { targetFile.delete() }
+                taskDao.updateTaskStatus(task.id, TaskStatus.FAILED, validation.reason)
             }
         }
     }

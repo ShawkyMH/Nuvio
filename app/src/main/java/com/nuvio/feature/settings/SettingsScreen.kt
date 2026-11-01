@@ -1,47 +1,26 @@
 package com.nuvio.feature.settings
 
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.outlined.ColorLens
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.SdCard
+import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -49,31 +28,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.nuvio.R
+import com.nuvio.core.designsystem.component.formatBytes
 import com.nuvio.core.update.UpdateDialog
-import com.nuvio.core.update.UpdateStatus
 import com.nuvio.core.update.UpdateUiEvent
 import com.nuvio.core.update.UpdateViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.nuvio.feature.settings.component.SettingsCard
+import com.nuvio.feature.settings.component.SettingsNavRow
+import com.nuvio.feature.settings.component.SettingsSectionTitle
+import com.nuvio.feature.settings.screen.AboutSettingsScreen
+import com.nuvio.feature.settings.screen.AppearanceSettingsScreen
+import com.nuvio.feature.settings.screen.BrowserSettingsScreen
+import com.nuvio.feature.settings.screen.DownloadsSettingsScreen
+import com.nuvio.feature.settings.screen.MediaSettingsScreen
+import com.nuvio.feature.settings.screen.NotificationSettingsScreen
+import com.nuvio.feature.settings.screen.PlayerSettingsScreen
+import com.nuvio.feature.settings.screen.PrivacySettingsScreen
+import com.nuvio.feature.settings.screen.StorageSettingsScreen
+import com.nuvio.feature.settings.screen.UpdatesSettingsScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     updateViewModel: UpdateViewModel,
+    onNavigateToLibrary: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val currentSubScreen by viewModel.currentSubScreen.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val storage by viewModel.storageMetrics.collectAsState()
     val updateState by updateViewModel.updateState.collectAsState()
     val context = LocalContext.current
 
@@ -86,443 +73,195 @@ fun SettingsScreen(
         }
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Settings",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold
+    // Intercept back navigation when on a sub-screen
+    BackHandler(enabled = currentSubScreen != null) {
+        viewModel.navigateToSubScreen(null)
+    }
+
+    when (currentSubScreen) {
+        SettingsSubScreen.DOWNLOADS -> {
+            DownloadsSettingsScreen(
+                viewModel = viewModel,
+                onBack = { viewModel.navigateToSubScreen(null) }
+            )
+        }
+        SettingsSubScreen.MEDIA -> {
+            MediaSettingsScreen(
+                viewModel = viewModel,
+                onBack = { viewModel.navigateToSubScreen(null) }
+            )
+        }
+        SettingsSubScreen.STORAGE -> {
+            StorageSettingsScreen(
+                viewModel = viewModel,
+                onBack = { viewModel.navigateToSubScreen(null) },
+                onNavigateToLibrary = {
+                    viewModel.navigateToSubScreen(null)
+                    onNavigateToLibrary?.invoke()
+                }
+            )
+        }
+        SettingsSubScreen.NOTIFICATIONS -> {
+            NotificationSettingsScreen(
+                viewModel = viewModel,
+                onBack = { viewModel.navigateToSubScreen(null) }
+            )
+        }
+        SettingsSubScreen.BROWSER -> {
+            BrowserSettingsScreen(
+                viewModel = viewModel,
+                onBack = { viewModel.navigateToSubScreen(null) }
+            )
+        }
+        SettingsSubScreen.PLAYER -> {
+            PlayerSettingsScreen(
+                viewModel = viewModel,
+                onBack = { viewModel.navigateToSubScreen(null) }
+            )
+        }
+        SettingsSubScreen.APPEARANCE -> {
+            AppearanceSettingsScreen(
+                viewModel = viewModel,
+                onBack = { viewModel.navigateToSubScreen(null) }
+            )
+        }
+        SettingsSubScreen.PRIVACY -> {
+            PrivacySettingsScreen(
+                viewModel = viewModel,
+                onBack = { viewModel.navigateToSubScreen(null) }
+            )
+        }
+        SettingsSubScreen.UPDATES -> {
+            UpdatesSettingsScreen(
+                viewModel = viewModel,
+                updateViewModel = updateViewModel,
+                onBack = { viewModel.navigateToSubScreen(null) }
+            )
+        }
+        SettingsSubScreen.ABOUT -> {
+            AboutSettingsScreen(
+                updateViewModel = updateViewModel,
+                onBack = { viewModel.navigateToSubScreen(null) }
+            )
+        }
+        null -> {
+            // Main Settings Hub
+            Scaffold(
+                modifier = modifier.fillMaxSize(),
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = "Settings",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        )
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // Downloads Section
-            item {
-                SettingsSectionHeader(title = "Downloads")
-            }
-
-            item {
-                Card(
+                containerColor = MaterialTheme.colorScheme.background
+            ) { innerPadding ->
+                LazyColumn(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
+                        .fillMaxSize()
+                        .padding(innerPadding)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Wifi,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.size(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Download on Wi-Fi Only",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "Conserve cellular mobile data",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Switch(
-                                checked = settings.wifiOnly,
-                                onCheckedChange = viewModel::updateWifiOnly
+                    item {
+                        SettingsSectionTitle("Engine & Operations")
+                        SettingsCard {
+                            SettingsNavRow(
+                                title = "Downloads",
+                                subtitle = "Concurrent tasks, connections, Wi-Fi only, retries",
+                                icon = Icons.Outlined.Download,
+                                statusText = "${settings.concurrentDownloads} active • ${settings.connectionsPerDownload} threads",
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.DOWNLOADS) }
                             )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Connections slider
-                        Text(
-                            text = "Parallel Connections per File: ${settings.connectionsPerDownload}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Slider(
-                            value = settings.connectionsPerDownload.toFloat(),
-                            onValueChange = { viewModel.updateConnectionsPerDownload(it.toInt()) },
-                            valueRange = 1f..8f,
-                            steps = 6
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Concurrent downloads slider
-                        Text(
-                            text = "Max Concurrent Downloads: ${settings.concurrentDownloads}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Slider(
-                            value = settings.concurrentDownloads.toFloat(),
-                            onValueChange = { viewModel.updateConcurrentDownloads(it.toInt()) },
-                            valueRange = 1f..5f,
-                            steps = 3
-                        )
-                    }
-                }
-            }
-
-            // Appearance Section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "Appearance")
-            }
-
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.ColorLens,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.size(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Dynamic Color (Material You)",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "Match wallpaper theme on Android 12+",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Switch(
-                                checked = settings.dynamicColor,
-                                onCheckedChange = viewModel::updateDynamicColor
+                            SettingsNavRow(
+                                title = "Video & Audio",
+                                subtitle = "Preferred resolutions, formats, subtitles, bitrates",
+                                icon = Icons.Outlined.VideoLibrary,
+                                statusText = "${settings.preferredVideoQuality} • ${settings.defaultVideoFormat.uppercase()}",
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.MEDIA) }
+                            )
+                            SettingsNavRow(
+                                title = "Storage",
+                                subtitle = "Download folders, cache size, cleanup staging files",
+                                icon = Icons.Outlined.SdCard,
+                                statusText = "${formatBytes(storage.downloadsSizeBytes)} used",
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.STORAGE) }
                             )
                         }
                     }
-                }
-            }
 
-            // Engine & Components Section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "Engine & Components")
-            }
-
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        ComponentInfoRow(name = "ExoPlayer Engine", version = "AndroidX Media3 1.2.1")
-                        Spacer(modifier = Modifier.height(10.dp))
-                        ComponentInfoRow(name = "HTTP Transfer Engine", version = "Nuvio Segmented Range v1.0")
-                        Spacer(modifier = Modifier.height(10.dp))
-                        ComponentInfoRow(name = "yt-dlp Extraction Protocol", version = "Clean-Room IPC v2024")
-                        Spacer(modifier = Modifier.height(10.dp))
-                        ComponentInfoRow(name = "Media Remuxer", version = "FFmpeg Stream Muxer")
-                    }
-                }
-            }
-
-            // Privacy & Security Section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "Privacy & Security")
-            }
-
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Security,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.size(12.dp))
-                            Column {
-                                Text(
-                                    text = "100% Local & Offline-First",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "Zero tracking, zero analytics, no user accounts",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.clearHistory()
-                                    Toast.makeText(context, "Playback history cleared", Toast.LENGTH_SHORT).show()
-                                },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                            Spacer(modifier = Modifier.size(12.dp))
-                            Text(
-                                text = "Clear Playback History",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.error,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
-
-            // App Updates Section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "App Updates")
-            }
-
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.SystemUpdate,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.size(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Nuvio Version ${updateState.currentVersionName}",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    val statusText = when (updateState.status) {
-                                        UpdateStatus.CHECKING -> "Checking for updates..."
-                                        UpdateStatus.UPDATE_AVAILABLE -> "Update available (v${updateState.updateInfo?.versionName})"
-                                        UpdateStatus.UP_TO_DATE -> "App is up to date"
-                                        UpdateStatus.DOWNLOADING -> "Downloading update (${updateState.downloadProgressPercent}%)"
-                                        UpdateStatus.VERIFYING -> "Verifying update checksum..."
-                                        UpdateStatus.READY_TO_INSTALL -> "Ready to install"
-                                        UpdateStatus.INSTALLING -> "Installing update..."
-                                        UpdateStatus.FAILED -> updateState.errorMessage ?: "Check failed"
-                                        UpdateStatus.IDLE -> "Build ${updateState.currentVersionCode}"
-                                    }
-                                    Text(
-                                        text = statusText,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (updateState.status == UpdateStatus.UPDATE_AVAILABLE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            if (updateState.status == UpdateStatus.CHECKING) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            } else {
-                                IconButton(onClick = { updateViewModel.checkForUpdates(manual = true) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Check for Updates",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-
-                        if (updateState.lastCheckedTimestamp > 0) {
-                            val timeStr = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(updateState.lastCheckedTimestamp))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Last checked: $timeStr",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
-                        }
-
-                        if (updateState.status == UpdateStatus.UPDATE_AVAILABLE || updateState.status == UpdateStatus.READY_TO_INSTALL) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = {
-                                    if (updateState.status == UpdateStatus.READY_TO_INSTALL) {
-                                        updateViewModel.installUpdate()
-                                    } else {
-                                        updateViewModel.downloadUpdate()
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(
-                                    text = if (updateState.status == UpdateStatus.READY_TO_INSTALL) "Install Update" else "Download Update (v${updateState.updateInfo?.versionName})"
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // About Section
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SettingsSectionHeader(title = "About Nuvio")
-            }
-
-            item {
-                val isDark = isSystemInDarkTheme()
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Image(
-                            painter = painterResource(
-                                id = if (isDark) R.drawable.nuvio_logo_dark else R.drawable.nuvio_logo_light
-                            ),
-                            contentDescription = "Nuvio Logo",
-                            modifier = Modifier
-                                .height(52.dp)
-                                .padding(vertical = 4.dp)
-                        )
-
+                    item {
                         Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = "Premium Media Downloader & Player",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        ComponentInfoRow(
-                            name = "Application Version",
-                            version = "v${updateState.currentVersionName} (Build ${updateState.currentVersionCode})"
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        ComponentInfoRow(
-                            name = "License",
-                            version = "Apache 2.0"
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        OutlinedButton(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ShawkyMH/Nuvio"))
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Code,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                        SettingsSectionTitle("Experience & Content")
+                        SettingsCard {
+                            SettingsNavRow(
+                                title = "Browser",
+                                subtitle = "Search engine, homepage, desktop mode, media detector",
+                                icon = Icons.Outlined.Language,
+                                statusText = settings.searchEngine,
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.BROWSER) }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("GitHub Repository")
+                            SettingsNavRow(
+                                title = "Media Player",
+                                subtitle = "Remember position, playback speed, background audio",
+                                icon = Icons.Outlined.PlayCircle,
+                                statusText = "${settings.defaultPlaybackSpeed}x",
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.PLAYER) }
+                            )
+                            SettingsNavRow(
+                                title = "Notifications",
+                                subtitle = "Transfer alerts, progress indicators, update prompts",
+                                icon = Icons.Outlined.Notifications,
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.NOTIFICATIONS) }
+                            )
                         }
+                    }
 
+                    item {
                         Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = "Clean-room implementation inspired by Snaptube, VRKA, and ADM. Built with Material 3 & Jetpack Compose.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            textAlign = TextAlign.Center
-                        )
+                        SettingsSectionTitle("System & Device")
+                        SettingsCard {
+                            val themeName = when (settings.darkMode) {
+                                null -> "System Default"
+                                true -> "Dark"
+                                false -> "Light"
+                            }
+                            SettingsNavRow(
+                                title = "Appearance",
+                                subtitle = "Theme, dynamic colors, typography, language",
+                                icon = Icons.Outlined.ColorLens,
+                                statusText = themeName,
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.APPEARANCE) }
+                            )
+                            SettingsNavRow(
+                                title = "Privacy & Security",
+                                subtitle = "Local-only storage, history management, zero telemetry",
+                                icon = Icons.Outlined.Lock,
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.PRIVACY) }
+                            )
+                            SettingsNavRow(
+                                title = "App Updates",
+                                subtitle = "Check for updates, release notes, SHA-256 verification",
+                                icon = Icons.Outlined.SystemUpdate,
+                                statusText = "v${updateState.currentVersionName}",
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.UPDATES) }
+                            )
+                            SettingsNavRow(
+                                title = "About Nuvio",
+                                subtitle = "Version details, open source licenses, team charter",
+                                icon = Icons.Outlined.Info,
+                                onClick = { viewModel.navigateToSubScreen(SettingsSubScreen.ABOUT) }
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -534,37 +273,6 @@ fun SettingsScreen(
             onInstallClick = updateViewModel::installUpdate,
             onCancelClick = updateViewModel::cancelDownload,
             onDismiss = updateViewModel::dismissDialog
-        )
-    }
-}
-
-@Composable
-private fun SettingsSectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
-    )
-}
-
-@Composable
-private fun ComponentInfoRow(name: String, version: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
-        Text(
-            text = version,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

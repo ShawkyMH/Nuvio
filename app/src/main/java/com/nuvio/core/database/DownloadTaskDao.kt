@@ -24,7 +24,7 @@ class DownloadTaskDao(private val dbHelper: NuvioDatabaseHelper) {
     }.flowOn(Dispatchers.IO)
 
     fun observeActiveTasks(): Flow<List<DownloadTask>> = flow {
-        val selection = "status IN ('QUEUED', 'INSPECTING', 'DOWNLOADING', 'PROCESSING')"
+        val selection = "status IN ('QUEUED', 'INSPECTING', 'DOWNLOADING', 'FINALIZING', 'VALIDATING', 'PROCESSING')"
         emit(queryTasks(selection, null))
         tableUpdates.collect {
             emit(queryTasks(selection, null))

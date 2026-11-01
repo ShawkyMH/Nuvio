@@ -11,6 +11,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import com.nuvio.domain.repository.PlaybackRepository
+import com.nuvio.domain.repository.SettingsRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,7 +36,8 @@ data class PlayerUiState(
 @OptIn(UnstableApi::class)
 class PlayerViewModel(
     private val context: Context,
-    private val playbackRepository: PlaybackRepository
+    private val playbackRepository: PlaybackRepository,
+    private val settingsRepository: SettingsRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
@@ -59,6 +61,14 @@ class PlayerViewModel(
                         _uiState.value = _uiState.value.copy(durationMs = duration.coerceAtLeast(0L))
                     }
                 }
+
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Playback error: ${error.localizedMessage ?: "Unsupported or corrupted media"}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             })
         }
         startProgressTracker()
@@ -66,11 +76,25 @@ class PlayerViewModel(
 
     fun playMedia(uri: String, title: String) {
         val player = exoPlayer ?: return
-        _uiState.value = _uiState.value.copy(title = title, mediaUri = uri)
+        val defaultSpeed = settingsRepository?.settingsFlow?.value?.defaultPlaybackSpeed ?: 1.0f
+        val rememberPos = settingsRepository?.settingsFlow?.value?.rememberPlaybackPosition ?: true
+
+        _uiState.value = _uiState.value.copy(
+            title = title,
+            mediaUri = uri,
+            playbackSpeed = defaultSpeed,
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+        )
 
         viewModelScope.launch {
-            val savedPos = playbackRepository.getLastPlaybackPosition(uri)
-            val mediaItem = MediaItem.fromUri(uri)
+            val savedPos = if (rememberPos) playbackRepository.getLastPlaybackPosition(uri) else 0L
+            val parsedUri = if (uri.startsWith("http://") || uri.startsWith("https://") || uri.startsWith("content://") || uri.startsWith("file://")) {
+                android.net.Uri.parse(uri)
+            } else {
+                android.net.Uri.fromFile(java.io.File(uri))
+            }
+            val mediaItem = MediaItem.fromUri(parsedUri)
+            player.playbackParameters = PlaybackParameters(defaultSpeed)
             player.setMediaItem(mediaItem)
             player.prepare()
             if (savedPos > 0) {

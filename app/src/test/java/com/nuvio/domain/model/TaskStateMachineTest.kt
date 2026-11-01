@@ -11,6 +11,8 @@ class TaskStateMachineTest {
         assertTrue(TaskStatus.QUEUED.isActive)
         assertTrue(TaskStatus.INSPECTING.isActive)
         assertTrue(TaskStatus.DOWNLOADING.isActive)
+        assertTrue(TaskStatus.FINALIZING.isActive)
+        assertTrue(TaskStatus.VALIDATING.isActive)
         assertTrue(TaskStatus.PROCESSING.isActive)
 
         assertFalse(TaskStatus.CREATED.isActive)

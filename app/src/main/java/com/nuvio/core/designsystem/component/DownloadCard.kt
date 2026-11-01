@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.nuvio.core.util.FileOpener
 import com.nuvio.domain.model.DownloadTask
 import com.nuvio.domain.model.TaskStatus
 import java.util.Locale
@@ -113,7 +115,7 @@ fun DownloadCard(
 
                 Row {
                     when (task.status) {
-                        TaskStatus.DOWNLOADING, TaskStatus.QUEUED, TaskStatus.INSPECTING -> {
+                        TaskStatus.DOWNLOADING, TaskStatus.QUEUED, TaskStatus.INSPECTING, TaskStatus.FINALIZING, TaskStatus.VALIDATING -> {
                             IconButton(onClick = onPauseClick, modifier = Modifier.size(32.dp)) {
                                 Icon(
                                     imageVector = Icons.Default.Pause,
@@ -155,10 +157,11 @@ fun DownloadCard(
                             }
                         }
                         TaskStatus.COMPLETED -> {
+                            val isMedia = FileOpener.isMediaFile(task.filePath)
                             IconButton(onClick = onPlayClick, modifier = Modifier.size(32.dp)) {
                                 Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Play",
+                                    imageVector = if (isMedia) Icons.Default.PlayArrow else Icons.Default.OpenInNew,
+                                    contentDescription = if (isMedia) "Play" else "Open",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -175,6 +178,8 @@ fun DownloadCard(
 private fun StatusBadge(status: TaskStatus) {
     val (text, color) = when (status) {
         TaskStatus.DOWNLOADING -> "Downloading" to MaterialTheme.colorScheme.primary
+        TaskStatus.FINALIZING -> "Finalizing" to MaterialTheme.colorScheme.secondary
+        TaskStatus.VALIDATING -> "Validating" to MaterialTheme.colorScheme.secondary
         TaskStatus.QUEUED -> "Queued" to MaterialTheme.colorScheme.onSurfaceVariant
         TaskStatus.INSPECTING -> "Inspecting" to MaterialTheme.colorScheme.secondary
         TaskStatus.PAUSED -> "Paused" to MaterialTheme.colorScheme.onSurfaceVariant

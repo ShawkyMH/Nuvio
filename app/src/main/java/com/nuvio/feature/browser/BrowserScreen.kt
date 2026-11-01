@@ -76,6 +76,7 @@ fun BrowserScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val appSettings by (viewModel.settingsFlow?.collectAsState() ?: remember { mutableStateOf(null) })
     val context = LocalContext.current
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var addressInput by remember { mutableStateOf(uiState.currentUrl) }
@@ -244,6 +245,11 @@ fun BrowserScreen(
                             useWideViewPort = true
                             loadWithOverviewMode = true
                             cacheMode = WebSettings.LOAD_DEFAULT
+                            val isDesktop = appSettings?.desktopSite ?: false
+                            if (isDesktop) {
+                                userAgentString = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                            }
+                            javaScriptEnabled = appSettings?.javaScriptEnabled ?: true
                         }
 
                         webViewClient = object : WebViewClient() {
@@ -292,6 +298,15 @@ fun BrowserScreen(
                         loadUrl(uiState.currentUrl)
                         webViewInstance = this
                     }
+                },
+                update = { webView ->
+                    val isDesktop = appSettings?.desktopSite ?: false
+                    webView.settings.userAgentString = if (isDesktop) {
+                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    } else {
+                        null
+                    }
+                    webView.settings.javaScriptEnabled = appSettings?.javaScriptEnabled ?: true
                 },
                 modifier = Modifier.fillMaxSize()
             )

@@ -67,7 +67,9 @@ class AppContainer(private val context: Context) {
             taskDao = taskDao,
             segmentDao = segmentDao,
             fileManager = fileManager,
-            executionCoordinator = executionCoordinator
+            executionCoordinator = executionCoordinator,
+            settingsRepository = settingsRepository,
+            context = context
         )
     }
 
@@ -93,7 +95,11 @@ class AppContainer(private val context: Context) {
     }
 
     val settingsRepository: SettingsRepository by lazy {
-        SettingsRepositoryImpl(context)
+        SettingsRepositoryImpl(
+            context = context,
+            fileManager = fileManager,
+            playbackHistoryDao = playbackHistoryDao
+        )
     }
 
     val mediaRepository: MediaRepository by lazy {

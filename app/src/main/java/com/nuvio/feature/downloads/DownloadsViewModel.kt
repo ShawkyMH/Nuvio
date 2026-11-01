@@ -7,6 +7,7 @@ import com.nuvio.core.storage.FileManager
 import com.nuvio.domain.model.DownloadTask
 import com.nuvio.domain.model.TaskStatus
 import com.nuvio.domain.repository.DownloadRepository
+import com.nuvio.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,8 @@ enum class DownloadFilter {
 
 class DownloadsViewModel(
     private val repository: DownloadRepository,
-    private val fileManager: FileManager
+    private val fileManager: FileManager,
+    private val settingsRepository: SettingsRepository? = null
 ) : ViewModel() {
 
     private val _selectedFilter = MutableStateFlow(DownloadFilter.ALL)
@@ -86,7 +88,7 @@ class DownloadsViewModel(
                     filePath = targetFile.absolutePath,
                     mimeType = "*/*",
                     isMediaExtraction = false,
-                    connectionCount = 4,
+                    connectionCount = settingsRepository?.settingsFlow?.value?.connectionsPerDownload ?: 4,
                     status = TaskStatus.QUEUED
                 )
                 repository.insertTask(task)

@@ -10,6 +10,7 @@ import com.nuvio.domain.model.MediaMetadata
 import com.nuvio.domain.model.TaskStatus
 import com.nuvio.domain.repository.DownloadRepository
 import com.nuvio.domain.repository.MediaRepository
+import com.nuvio.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -37,7 +38,8 @@ data class HomeUiState(
 class HomeViewModel(
     private val downloadRepository: DownloadRepository,
     private val mediaRepository: MediaRepository,
-    private val fileManager: FileManager
+    private val fileManager: FileManager,
+    private val settingsRepository: SettingsRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -98,7 +100,7 @@ class HomeViewModel(
                     filePath = targetFile.absolutePath,
                     mimeType = "*/*",
                     isMediaExtraction = false,
-                    connectionCount = 4,
+                    connectionCount = settingsRepository?.settingsFlow?.value?.connectionsPerDownload ?: 4,
                     status = TaskStatus.QUEUED
                 )
                 downloadRepository.insertTask(task)
@@ -140,7 +142,7 @@ class HomeViewModel(
                 mimeType = if (format.formatType == com.nuvio.domain.model.FormatType.AUDIO) "audio/*" else "video/*",
                 isMediaExtraction = true,
                 formatId = format.id,
-                connectionCount = 4,
+                connectionCount = settingsRepository?.settingsFlow?.value?.connectionsPerDownload ?: 4,
                 status = TaskStatus.QUEUED
             )
             downloadRepository.insertTask(task)

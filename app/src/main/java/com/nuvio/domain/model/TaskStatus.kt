@@ -5,6 +5,8 @@ enum class TaskStatus {
     QUEUED,
     INSPECTING,
     DOWNLOADING,
+    FINALIZING,
+    VALIDATING,
     PAUSED,
     PROCESSING,
     COMPLETED,
@@ -12,7 +14,8 @@ enum class TaskStatus {
     CANCELLED;
 
     val isActive: Boolean
-        get() = this == QUEUED || this == INSPECTING || this == DOWNLOADING || this == PROCESSING
+        get() = this == QUEUED || this == INSPECTING || this == DOWNLOADING ||
+                this == FINALIZING || this == VALIDATING || this == PROCESSING
 
     val isPaused: Boolean
         get() = this == PAUSED

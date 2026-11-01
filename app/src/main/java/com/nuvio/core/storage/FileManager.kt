@@ -108,4 +108,38 @@ class FileManager(private val context: Context) {
             temp.delete()
         }
     }
+
+    fun getDirectorySizeBytes(dir: File): Long {
+        if (!dir.exists()) return 0L
+        return runCatching {
+            dir.walkTopDown()
+                .filter { it.isFile }
+                .map { it.length() }
+                .sum()
+        }.getOrDefault(0L)
+    }
+
+    fun getDownloadsSizeBytes(): Long = getDirectorySizeBytes(downloadsDir)
+
+    fun getStagingSizeBytes(): Long = getDirectorySizeBytes(tempDir)
+
+    fun getCacheSizeBytes(): Long = getDirectorySizeBytes(context.cacheDir)
+
+    fun clearStagingFiles(): Long {
+        var reclaimed = 0L
+        tempDir.listFiles()?.forEach { file ->
+            reclaimed += file.length()
+            runCatching { file.delete() }
+        }
+        return reclaimed
+    }
+
+    fun clearCache(): Long {
+        var reclaimed = 0L
+        context.cacheDir.listFiles()?.forEach { file ->
+            reclaimed += if (file.isDirectory) getDirectorySizeBytes(file) else file.length()
+            runCatching { file.deleteRecursively() }
+        }
+        return reclaimed
+    }
 }

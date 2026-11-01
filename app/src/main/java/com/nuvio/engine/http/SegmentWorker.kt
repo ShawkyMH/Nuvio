@@ -29,6 +29,7 @@ class SegmentWorker(
         val request = Request.Builder()
             .url(url)
             .header("Range", "bytes=$currentOffset-${segment.endByte}")
+            .header("Accept-Encoding", "identity")
             .build()
 
         var raf: RandomAccessFile? = null
@@ -63,6 +64,8 @@ class SegmentWorker(
                     // Task was cancelled or paused
                     return@withContext false
                 }
+
+                runCatching { raf?.channel?.force(true) }
 
                 val isComplete = totalSegmentDownloaded >= segment.totalBytes
                 val finalStatus = if (isComplete) SegmentStatus.COMPLETED else SegmentStatus.FAILED
