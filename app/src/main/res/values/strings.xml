@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Nuvio</string>
+    <string name="search_hint">Search or paste a video / download URL</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_downloads">Downloads</string>
+    <string name="nav_browser">Browser</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_settings">Settings</string>
+</resources>
